@@ -1,22 +1,27 @@
-create or replace PROCEDURE ADD_ORDER (cust_id NUMBER, complan VARCHAR2) AS
+-- creates a order
+CREATE OR REPLACE PROCEDURE ADD_ORDER (cust_id NUMBER, complan VARCHAR2) AS
   customer_id NUMBER;
-  commission_plan_missing EXCEPTION;
 BEGIN
-
+  -- Here we can live with NO_DATA_FOUND exception
   SELECT custid INTO customer_id FROM CUSTOMER where custid = cust_id;
   
+  -- Insert into the order (complan not checked because not specified so)
   INSERT INTO ORD (ORDID, ORDERDATE, COMMPLAN, CUSTID)
     VALUES (ORDID.NEXTVAL, SYSDATE, complan, cust_id);
-    
+   
+-- Handle the possible thrown exceptions 
 EXCEPTION
   WHEN NO_DATA_FOUND THEN
     dbms_output.put_line('No customer found');
   WHEN OTHERS THEN
-    dbms_output.put_line('An unexpected error occurred !!! SQLCODE: ' || SQLCODE);
+    dbms_output.put_line('An unexpected error occurred !!! SQLCODE: ' || SQLCODE ||' | SQLMESSAGE: ' || SUBSTR(SQLERRM, 1, 200));
     
 END ADD_ORDER;
+
 /
-create or replace PROCEDURE ADD_ITEM (order_number NUMBER, product_number NUMBER, price NUMBER, amount NUMBER) AS
+
+-- Adds a item to the given order 
+CREATE OR REPLACE PROCEDURE ADD_ITEM (order_number NUMBER, product_number NUMBER, price NUMBER, amount NUMBER) AS
   cnt NUMBER;
   product_not_found EXCEPTION;
   order_not_found EXCEPTION;
@@ -39,7 +44,9 @@ BEGIN
   IF price IS NULL THEN
     RAISE no_price;
   END IF;
-  IF amount IS NULL THEN 
+  
+  -- Amount must not be null or less or equal to 0
+  IF (amount IS NULL) AND (amount > 0) THEN 
     RAISE no_amount;
   END IF;
   
@@ -50,11 +57,12 @@ BEGIN
   INSERT INTO ITEM (ORDID, ITEMID, PRODID, ACTUALPRICE, QTY, ITEMTOT)
     VALUES (order_number, (cnt + 1), product_number, price, amount, (amount * price));
   
+-- Handle the thrown exceptions
 EXCEPTION
   WHEN no_price THEN
     dbms_output.put_line('Price must be defined');
   WHEN no_amount THEN
-    dbms_output.put_line('Amount must be defined');
+    dbms_output.put_line('Amount must be defined and > 0');
   WHEN order_not_found THEN
     dbms_output.put_line('Order not found !!! ordid:' || order_number);
   WHEN product_not_found THEN
@@ -64,3 +72,12 @@ EXCEPTION
   WHEN OTHERS THEN
     dbms_output.put_line('An unexpected error occurred !!! SQLCODE: ' || SQLCODE ||' | SQLMESSAGE: ' || SUBSTR(SQLERRM, 1, 200));
 END ADD_ITEM;
+
+/ 
+
+-- Tests
+EXEC ADD_ORDER(100, 'c');
+select ORDID.currval FROM DUAL;
+EXEC ADD_ITEM(625, 200380, 10.0, 50);
+EXEC ADD_ITEM(625, 200380, 10.0, 50);
+EXEC ADD_ITEM(625, 200380, 10.0, 50);

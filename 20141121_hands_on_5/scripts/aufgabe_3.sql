@@ -1,22 +1,42 @@
+-- Checks the credit limit of the customers and sets a flag if insufficent deposit
 CREATE OR REPLACE PROCEDURE CHECK_CREDITLIMIT AS
-  customer_id CUSTOMER.custid%TYPE;
-  customer_limit CUSTOMER.creditlimit%TYPE;
-  limit_indicator CUSTOMER.creditlimit_indicate%TYPE;
-  tot NUMBER;
-  CURSOR cr IS SELECT custid, creditlimit INTO customer_id, customer_limit FROM CUSTOMER;
+  total NUMBER;
+  limit_indicator VARCHAR(3);
+  CURSOR customerCursor IS SELECT custid, creditlimit, creditlimit_indicate FROM CUSTOMER;
+  tuple customerCursor%ROWTYPE;
 BEGIN
-  OPEN cr;
+  -- Open the cursor
+  OPEN customerCursor;
   
+  -- Iterate over the results
   LOOP
-    FETCH custid into customerId;
-    EXIT WHEN customer_id%NOTFOUND;
+    -- Get the result tuple 
+    FETCH customerCursor into tuple;
+    EXIT WHEN customerCursor%NOTFOUND;
+    -- Get the current credit of the current customer
+    SELECT SUM(total) INTO total FROM ORD WHERE custId = tuple.custid;
     
-    SELECT MAX(total) INTO tot FROM ORD WHERE custId = customer_id;
-    IF(tot > customer_limit) THEN
+    -- Check the credit limit for the current customer and set or reset the flag
+    IF (total IS NOT NULL) AND (total > tuple.creditlimit) THEN
       limit_indicator := 'YES';
     ELSE
       limit_indicator := 'NO';
     END IF;
-      UPDATE CUSTOMER SET creditlimit_indicate=limit_indicator WHERE custid = customer_id;
+    
+    -- Check if the flag has changed, if yes perform update otherwise do nothing 
+    IF limit_indicator <> tuple.creditlimit_indicate THEN
+      UPDATE CUSTOMER SET creditlimit_indicate=limit_indicator WHERE custid = tuple.custid;
+    END IF;
+    
   END LOOP;
+  
+  -- Close the cursor
+  CLOSE customerCursor;
+  
 END CHECK_CREDITLIMIT;
+
+/ 
+
+begin
+CHECK_CREDITLIMIT();
+end;
